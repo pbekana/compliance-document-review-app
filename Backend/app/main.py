@@ -1,12 +1,19 @@
 from fastapi import FastAPI
-app = FastAPI(
-    title="Compliance Document Review App",
-    version="1.0.0"
-)
+from app.auth.router import router as auth_router
 
-@app.get("/heath")
+from app.db.database import Base, engine
+from app.model.user import User
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(
+title="Compliance Document Review App",
+version="1.0.0"
+)
+app.include_router(auth_router)
+@app.get("/health")
 def health_check():
-  return {
-    "status":"health",
-    "message":"Backend is running smoothly  is running successfully"
-      }
+   return {
+   "status": "healthy",
+   "message": "Backend is running successfully"
+   }
