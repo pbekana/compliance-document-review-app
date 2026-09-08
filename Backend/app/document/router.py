@@ -1,3 +1,6 @@
+import os
+from app.auth.service_auth import verify_internal_service_token
+from fastapi import Header
 from fastapi import (
     APIRouter,
     Depends,
@@ -88,7 +91,7 @@ async def upload_document(
 @router.get("/{document_id}/file")
 async def get_document_file(
     document_id: int,
-    current_user: User = Depends(get_current_user),
+    _: None = Depends(verify_internal_service_token),
     db: Session = Depends(get_db)
 ):
     document = (
