@@ -12,7 +12,7 @@ from app.schema.auth import Token, UserLogin
 from app.schema.user import UserRegister, UserResponse
 
 router = APIRouter(
-prefix="/auth",
+prefix="/api/v1/auth",
 tags=["Authentication"]
 )
 

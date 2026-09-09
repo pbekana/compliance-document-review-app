@@ -10,7 +10,7 @@ from app.schema.review import ReviewCreate, ReviewResponse
 from app.model.revision import DocumentRevision
 
 router = APIRouter(
-    prefix="/reviews",
+    prefix="/api/v1/reviews",
     tags=["Reviews"]
 )
 

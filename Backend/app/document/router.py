@@ -26,7 +26,7 @@ from app.utils.storage import (
 
 
 router = APIRouter(
-    prefix="/documents",
+    prefix="/api/v1/documents",
     tags=["Documents"]
 )
 
