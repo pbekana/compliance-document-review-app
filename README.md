@@ -33,7 +33,9 @@ Backend/
 │   ├── model/
 │   ├── schema/
 │   ├── database.py
+        revision.py
 │   └── main.py
+        
 │
 ├── uploads/
 ├── requirements.txt
@@ -115,7 +117,7 @@ The platform repository is responsible for connecting the backend to the shared 
 #### Register
 
 ```http
-POST /auth/register
+POST /api/v1/auth/register
 ```
 
 Example request:
@@ -132,7 +134,7 @@ Example request:
 #### Login
 
 ```http
-POST /auth/login
+POST api/v1/auth/login
 ```
 
 Example request:
@@ -156,7 +158,7 @@ Returns a JWT access token:
 #### Current User
 
 ```http
-GET /auth/me
+GET /api/v1/auth/me
 ```
 
 Requires:
@@ -170,7 +172,7 @@ Authorization: Bearer <jwt-token>
 ### Upload Document
 
 ```http
-POST /documents/upload
+POST api/v1/documents/upload
 ```
 
 Requires a user JWT.
@@ -194,7 +196,7 @@ Example response:
 ### Internal Document File Access
 
 ```http
-GET /documents/{document_id}/file
+GET api/v1/documents/{document_id}/file
 ```
 
 This endpoint is intended for **Data Engineering**, not normal user access.
@@ -217,7 +219,7 @@ Example:
 
 ```bash
 curl -i \
-  http://127.0.0.1:8000/documents/7/file \
+  http://127.0.0.1:8000/api/v1/documents/7/file \
   -H "Authorization: Bearer $INTERNAL_SERVICE_TOKEN"
 ```
 
@@ -288,8 +290,8 @@ Authorization: Bearer <JWT>
 Used for normal application endpoints such as:
 
 ```text
-/auth/me
-/documents/upload
+/appi/v1/auth/me
+/api/v1/documents/upload
 ```
 
 ### Internal Service Authentication
@@ -303,7 +305,7 @@ Authorization: Bearer <INTERNAL_SERVICE_TOKEN>
 The internal token is used by Data Engineering to access:
 
 ```text
-GET /documents/{document_id}/file
+GET /api/v1/documents/{document_id}/file
 ```
 
 The internal token must never be committed to Git.
@@ -322,7 +324,7 @@ Do not commit `.env` or real secrets to Git.
 The backend exposes:
 
 ```http
-GET /health
+GET /api/v1/health
 ```
 
 This can be used by Docker Compose or other services to check whether the backend is running.
