@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.db.database import Base
@@ -40,3 +41,5 @@ class Document(Base):
         DateTime(timezone=True),
         onupdate=func.now()
     )
+
+    ai_analysis = relationship("AIAnalysis", back_populates="document", uselist=False)

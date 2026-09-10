@@ -1,6 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
-
-from app.model.user import UserRole
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserRegister(BaseModel):
@@ -16,15 +14,13 @@ class UserRegister(BaseModel):
         max_length=72
     )
 
-    role: UserRole
+    role: str
 
 
 class UserResponse(BaseModel):
     id: int
     full_name: str
     email: EmailStr
-    role: UserRole
+    role: str
 
-    class Config:
-        from_attributes = True
-   
+    model_config = ConfigDict(from_attributes=True)
