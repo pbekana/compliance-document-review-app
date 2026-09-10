@@ -63,6 +63,7 @@ Configure the `.env` file:
 ```env
 DATABASE_URL=postgresql://postgres:<password>@localhost:5432/compliance_db
 INTERNAL_SERVICE_TOKEN=<internal-service-token>
+AI_SERVICE_URL=http://ai:8001
 ```
 
 Start the backend:
@@ -109,6 +110,59 @@ For the final platform setup, the backend should use the PostgreSQL service prov
 The platform repository is responsible for connecting the backend to the shared PostgreSQL/pgvector database.
 
 ## API Endpoints
+
+### AI Analysis
+
+The backend exposes AI orchestration endpoints for the frontend while keeping the real model logic in the AI service.
+
+#### Trigger AI Analysis
+
+```http
+POST /api/v1/documents/{document_id}/analyze
+```
+
+Requires a user JWT for the frontend request. The backend verifies document access and then calls the external AI service at:
+
+```text
+POST /ai/analyze/{document_id}
+```
+
+The external AI service is configured with `AI_SERVICE_URL` and should typically resolve to:
+
+```text
+http://ai:8001
+```
+
+when both backend and AI run in the same Docker Compose network.
+
+The AI service is expected to return a frontend-compatible payload shaped like:
+
+```json
+{
+  "summary": "...",
+  "flags": [
+    {
+      "severity": "HIGH",
+      "title": "...",
+      "passage": "...",
+      "matchedRule": "...",
+      "explanation": "...",
+      "page": 2
+    }
+  ],
+  "generatedAt": "2026-09-10T00:00:00Z"
+}
+```
+
+#### Get Stored AI Analysis
+
+```http
+GET /api/v1/documents/{document_id}/analysis
+```
+
+Requires a user JWT. Returns the latest saved analysis for the document, including compliance flags and `generatedAt`.
+
+If no analysis has been generated yet, the backend responds with a 404.
 
 ### Authentication
 
@@ -310,10 +364,11 @@ The internal token must never be committed to Git.
 
 ## Environment Variables
 
-| Variable                 | Purpose                                      |
-| ------------------------ | -------------------------------------------- |
-| `DATABASE_URL`           | PostgreSQL database connection               |
-| `INTERNAL_SERVICE_TOKEN` | Authentication for trusted internal services |
+| Variable                 | Purpose                                                    |
+| ------------------------ | ---------------------------------------------------------- |
+| `DATABASE_URL`           | PostgreSQL database connection                             |
+| `INTERNAL_SERVICE_TOKEN` | Authentication for trusted internal services               |
+| `AI_SERVICE_URL`         | Base URL for the external AI service, e.g. `http://ai:8001` |
 
 Do not commit `.env` or real secrets to Git.
 
@@ -342,9 +397,50 @@ Implemented:
 * [x] Document file storage
 * [x] Internal service authentication
 * [x] Data Engineering file-access endpoint
+* [x] AI analysis orchestration endpoints
+* [x] AI analysis persistence model and compliance flags
 * [x] Dockerfile
 * [x] Docker image builds successfully
 * [x] Health check endpoint
+
+### Verified runtime behavior
+
+The built backend was validated against the live runtime with a final end-to-end script covering:
+
+* health
+* signup
+* login
+* me
+* logout
+* document upload
+* document list
+* document detail
+* document download
+* review creation
+* review history
+* revision creation
+* revision history
+* internal file access
+* AI auth enforcement
+
+Observed results from the live run:
+
+* health: 200
+* signup: 201
+* login: 200
+* me: 200
+* logout: 200
+* upload: 201
+* list/detail/download: 200
+* review create/history: 201/200
+* revision create/history: 201/200
+* internal no-token / bad-token: 401
+* internal valid token: 200
+* AI unauthenticated request: 401
+* AI authenticated request while AI service is down: 503
+* AI GET before analysis created: 404
+
+This confirms the backend is working as designed, and the remaining blocker is external AI service availability rather than backend contract or route logic.
 
 ## Integration Responsibilities
 

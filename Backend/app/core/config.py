@@ -10,7 +10,7 @@ load_dotenv(ENV_FILE)
 DATABASE_URL = os.getenv("DATABASE_URL")
 JWT_SECRET = os.getenv("JWT_SECRET", "change_this_to_a_long_random_secret_key")
 PORT = int(os.getenv("PORT", "8000"))
-AI_SERVICE_URL = os.getenv("AI_SERVICE_URL")
+AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://ai:8001")
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
 CORS_ORIGINS = [
     origin.strip()

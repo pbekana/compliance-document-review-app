@@ -216,9 +216,6 @@ def call_ai_service_for_document(document_id: int) -> dict:
     headers = {
         "Content-Type": "application/json",
     }
-    if INTERNAL_SERVICE_TOKEN:
-        headers["Authorization"] = f"Bearer {INTERNAL_SERVICE_TOKEN}"
-        headers["X-Internal-Service-Token"] = INTERNAL_SERVICE_TOKEN
 
     request = urllib.request.Request(
         ai_url,
