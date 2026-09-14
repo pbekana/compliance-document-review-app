@@ -14,7 +14,7 @@ AI_SERVICE_URL = os.getenv("AI_SERVICE_URL")
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN")
 CORS_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("CORS_ORIGIN").split(",")
+    for origin in os.getenv("CORS_ORIGIN","").split(",")
     if origin.strip()
 ]
 
