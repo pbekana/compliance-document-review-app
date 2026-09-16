@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
 from app.auth.service_auth import verify_internal_service_token
-from app.core.config import AI_SERVICE_URL, INTERNAL_SERVICE_TOKEN
+from app.core.config import AI_SERVICE_URL, DATA_ENGINEERING_URL, INTERNAL_SERVICE_TOKEN
 from app.db.database import get_db
 from app.model.ai_analysis import AIAnalysis
 from app.model.compliance_flag import ComplianceFlag
@@ -205,7 +205,56 @@ def persist_ai_analysis(document: Document, db: Session, ai_payload: dict) -> AI
     return analysis
 
 
-def call_ai_service_for_document(document_id: int) -> dict:
+def call_data_engineering_for_document(document_id: int) -> str:
+    if not DATA_ENGINEERING_URL:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Data Engineering URL is not configured",
+        )
+
+    extraction_url = f"{DATA_ENGINEERING_URL.rstrip('/')}/documents/{document_id}/extracted-text"
+    headers = {}
+    if INTERNAL_SERVICE_TOKEN:
+        headers["Authorization"] = f"Bearer {INTERNAL_SERVICE_TOKEN}"
+
+    request = urllib.request.Request(extraction_url, headers=headers, method="GET")
+
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            response_body = response.read().decode("utf-8")
+            if not response_body:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Data Engineering returned an empty response",
+                )
+            payload = json.loads(response_body)
+    except urllib.error.HTTPError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Data Engineering rejected the request",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Data Engineering is unavailable",
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Data Engineering returned invalid JSON",
+        ) from exc
+
+    extracted_text = payload.get("extracted_text") if isinstance(payload, dict) else None
+    if not isinstance(extracted_text, str) or not extracted_text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Data Engineering returned invalid extracted text",
+        )
+
+    return extracted_text
+
+
+def call_ai_service_for_document(document_id: int, extracted_text: str) -> dict:
     if not AI_SERVICE_URL:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -216,10 +265,14 @@ def call_ai_service_for_document(document_id: int) -> dict:
     headers = {
         "Content-Type": "application/json",
     }
+    payload = {
+        "document_id": document_id,
+        "extracted_text": extracted_text,
+    }
 
     request = urllib.request.Request(
         ai_url,
-        data=json.dumps({}).encode("utf-8"),
+        data=json.dumps(payload).encode("utf-8"),
         headers=headers,
         method="POST",
     )
@@ -242,6 +295,11 @@ def call_ai_service_for_document(document_id: int) -> dict:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="AI service is unavailable",
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI service returned invalid JSON",
         ) from exc
 
 
@@ -571,7 +629,8 @@ def analyze_document(
 ):
     document = get_document_for_access(document_id, current_user, db)
 
-    ai_payload = call_ai_service_for_document(document_id)
+    extracted_text = call_data_engineering_for_document(document_id)
+    ai_payload = call_ai_service_for_document(document_id, extracted_text)
     normalized_payload = load_ai_service_response(ai_payload)
     normalized_payload["generatedAt"] = normalized_payload["generatedAt"] or datetime.utcnow()
 

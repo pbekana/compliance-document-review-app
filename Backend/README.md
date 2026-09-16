@@ -369,6 +369,7 @@ The internal token must never be committed to Git.
 | `DATABASE_URL`           | PostgreSQL database connection                             |
 | `INTERNAL_SERVICE_TOKEN` | Authentication for trusted internal services               |
 | `AI_SERVICE_URL`         | Base URL for the external AI service, e.g. `http://ai:8001` |
+| `DATA_ENGINEERING_URL`   | Base URL for the Data Engineering service, e.g. `http://data-engineering:8002` |
 
 Do not commit `.env` or real secrets to Git.
 
