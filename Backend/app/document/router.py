@@ -2,9 +2,9 @@ import json
 import urllib.error
 import urllib.request
 from datetime import datetime
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.background import BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -20,7 +20,7 @@ from app.model.user import User, UserRole
 from app.schema.ai_analysis import AIAnalysisResponse
 from app.schema.document import DocumentListResponse, DocumentResponse
 from app.schema.revision import RevisionResponse
-from app.utils.storage import generate_stored_filename, get_file_path
+from app.utils.storage import materialize_document, store_document
 
 
 router = APIRouter(
@@ -345,13 +345,9 @@ async def upload_document(
             detail="A file name is required",
         )
 
-    stored_filename = generate_stored_filename(file.filename)
-    file_path = get_file_path(stored_filename)
-
     try:
         contents = await file.read()
-        with open(file_path, "wb") as buffer:
-            buffer.write(contents)
+        stored_file = store_document(contents, file.filename, file.content_type)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -360,8 +356,9 @@ async def upload_document(
 
     document = Document(
         filename=file.filename,
-        stored_filename=stored_filename,
-        file_path=str(file_path),
+        stored_filename=stored_file["stored_filename"],
+        file_path=stored_file["file_path"],
+        cloudinary_public_id=stored_file["cloudinary_public_id"],
         content_type=file.content_type,
         file_size=len(contents),
         status="pending_review",
@@ -375,8 +372,8 @@ async def upload_document(
     revision = DocumentRevision(
         document_id=document.id,
         version=1,
-        stored_filename=stored_filename,
-        file_path=str(file_path),
+        stored_filename=stored_file["stored_filename"],
+        file_path=stored_file["file_path"],
         content_type=file.content_type,
         file_size=len(contents),
         status="pending_review",
@@ -465,6 +462,7 @@ def get_document_detail(
 @router.get("/{id}/download")
 def download_document(
     id: int,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -478,9 +476,15 @@ def download_document(
             detail="You can only download your own documents",
         )
 
-    file_path = Path(document.file_path)
-    if not file_path.exists():
+    try:
+        file_path = materialize_document(document)
+    except FileNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stored file not found")
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to retrieve stored file") from exc
+
+    if document.cloudinary_public_id and background_tasks:
+        background_tasks.add_task(file_path.unlink, missing_ok=True)
 
     return FileResponse(
         path=file_path,
@@ -492,6 +496,7 @@ def download_document(
 @router.get("/{document_id}/file")
 def get_document_file_internal(
     document_id: int,
+    background_tasks: BackgroundTasks,
     _: bool = Depends(verify_internal_service_token),
     db: Session = Depends(get_db),
 ):
@@ -499,9 +504,15 @@ def get_document_file_internal(
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    file_path = Path(document.file_path)
-    if not file_path.exists():
+    try:
+        file_path = materialize_document(document)
+    except FileNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stored file not found")
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to retrieve stored file") from exc
+
+    if document.cloudinary_public_id and background_tasks:
+        background_tasks.add_task(file_path.unlink, missing_ok=True)
 
     return FileResponse(
         path=file_path,
@@ -554,13 +565,9 @@ async def upload_revision(
     )
     next_version = (latest_revision.version + 1) if latest_revision else 1
 
-    stored_filename = generate_stored_filename(file.filename)
-    file_path = get_file_path(stored_filename)
-
     try:
         contents = await file.read()
-        with open(file_path, "wb") as buffer:
-            buffer.write(contents)
+        stored_file = store_document(contents, file.filename, file.content_type)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -570,14 +577,17 @@ async def upload_revision(
     revision = DocumentRevision(
         document_id=document_id,
         version=next_version,
-        stored_filename=stored_filename,
-        file_path=str(file_path),
+        stored_filename=stored_file["stored_filename"],
+        file_path=stored_file["file_path"],
         content_type=file.content_type,
         file_size=len(contents),
         status="pending_review",
     )
 
     document.status = "pending_review"
+    document.stored_filename = stored_file["stored_filename"]
+    document.file_path = stored_file["file_path"]
+    document.cloudinary_public_id = stored_file["cloudinary_public_id"]
     document.updated_at = None
 
     db.add(revision)

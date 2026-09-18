@@ -16,6 +16,8 @@ class Document(Base):
 
     file_path = Column(String(500), nullable=False)
 
+    cloudinary_public_id = Column(String(500), nullable=True)
+
     content_type = Column(String(100), nullable=False)
 
     file_size = Column(Integer, nullable=False)

@@ -62,8 +62,46 @@ Configure the `.env` file:
 
 ```env
 DATABASE_URL=postgresql://postgres:<password>@localhost:5432/compliance_db
+STORAGE_BACKEND=local
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
 INTERNAL_SERVICE_TOKEN=<internal-service-token>
 AI_SERVICE_URL=http://ai:8001
+```
+
+Local and Docker development uses `/app/uploads` and does not require Cloudinary
+credentials. Production should set `STORAGE_BACKEND=cloudinary`; documents are
+uploaded as authenticated Cloudinary raw assets and are retrieved through the
+Backend only. Cloudinary secrets must never be sent to the frontend.
+
+### Database migration
+
+`Base.metadata.create_all` creates the new column on a fresh database. For an
+existing PostgreSQL or Supabase database, run
+`migrations/001_add_cloudinary_public_id.sql` once before deploying the new
+Backend. The migration is additive and keeps existing local `file_path` values
+valid.
+
+The Backend does not use pgvector. If another service owns vector storage, that
+service should enable Supabase's `vector` extension; no vector extension is
+required for this Backend schema.
+
+### Railway environment variables
+
+Configure these variables in Railway without committing their values:
+
+```env
+DATABASE_URL=
+STORAGE_BACKEND=cloudinary
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+INTERNAL_SERVICE_TOKEN=
+AI_SERVICE_URL=
+DATA_ENGINEERING_URL=
+JWT_SECRET=
+CORS_ORIGIN=
 ```
 
 Start the backend:
@@ -367,6 +405,10 @@ The internal token must never be committed to Git.
 | Variable                 | Purpose                                                    |
 | ------------------------ | ---------------------------------------------------------- |
 | `DATABASE_URL`           | PostgreSQL database connection                             |
+| `STORAGE_BACKEND`        | `local` for Docker development or `cloudinary` in production |
+| `CLOUDINARY_CLOUD_NAME`  | Cloudinary cloud name for production storage              |
+| `CLOUDINARY_API_KEY`     | Cloudinary API key for production storage                 |
+| `CLOUDINARY_API_SECRET`  | Cloudinary API secret for production storage              |
 | `INTERNAL_SERVICE_TOKEN` | Authentication for trusted internal services               |
 | `AI_SERVICE_URL`         | Base URL for the external AI service, e.g. `http://ai:8001` |
 | `DATA_ENGINEERING_URL`   | Base URL for the Data Engineering service, e.g. `http://data-engineering:8002` |
