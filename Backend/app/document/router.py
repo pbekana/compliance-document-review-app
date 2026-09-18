@@ -157,12 +157,20 @@ def load_ai_service_response(payload: dict) -> dict:
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="AI service returned an invalid flag payload",
             )
+        title = flag.get("title") or "Untitled finding"
+        matched_rule = (
+            flag.get("matchedRule")
+            or flag.get("matched_rule")
+            or flag.get("matched_rule_id")
+            or flag.get("rule")
+            or title
+        )
         normalized_flags.append({
-            "severity": str(flag.get("severity", "LOW")).upper(),
-            "title": str(flag.get("title", "Untitled finding")),
-            "passage": str(flag.get("passage", "")),
-            "matchedRule": flag.get("matchedRule") or flag.get("matched_rule") or flag.get("rule"),
-            "explanation": str(flag.get("explanation", "")),
+            "severity": str(flag.get("severity") or "LOW").upper(),
+            "title": str(title),
+            "passage": str(flag.get("passage") or flag.get("passage_excerpt") or ""),
+            "matchedRule": str(matched_rule) if matched_rule is not None else None,
+            "explanation": str(flag.get("explanation") or ""),
             "page": flag.get("page"),
         })
 
@@ -245,6 +253,12 @@ def call_data_engineering_for_document(document_id: int) -> str:
         ) from exc
 
     extracted_text = payload.get("extracted_text") if isinstance(payload, dict) else None
+    returned_document_id = payload.get("document_id") if isinstance(payload, dict) else None
+    if returned_document_id is None or str(returned_document_id) != str(document_id):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Data Engineering returned text for a different document",
+        )
     if not isinstance(extracted_text, str) or not extracted_text.strip():
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -254,7 +268,7 @@ def call_data_engineering_for_document(document_id: int) -> str:
     return extracted_text
 
 
-def call_ai_service_for_document(document_id: int, extracted_text: str) -> dict:
+def call_ai_service_for_document(document_id: str, extracted_text: str) -> dict:
     if not AI_SERVICE_URL:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -266,7 +280,7 @@ def call_ai_service_for_document(document_id: int, extracted_text: str) -> dict:
         "Content-Type": "application/json",
     }
     payload = {
-        "document_id": document_id,
+        "document_id": str(document_id),
         "extracted_text": extracted_text,
     }
 
@@ -634,14 +648,15 @@ def analyze_document(
     normalized_payload = load_ai_service_response(ai_payload)
     normalized_payload["generatedAt"] = normalized_payload["generatedAt"] or datetime.utcnow()
 
-    existing_analysis = (
+    existing_analyses = (
         db.query(AIAnalysis)
         .filter(AIAnalysis.document_id == document_id)
         .order_by(AIAnalysis.generated_at.desc())
-        .first()
+        .all()
     )
-    if existing_analysis:
+    for existing_analysis in existing_analyses:
         db.delete(existing_analysis)
+    if existing_analyses:
         db.commit()
 
     saved_analysis = persist_ai_analysis(document, db, normalized_payload)

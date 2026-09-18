@@ -5,6 +5,7 @@ from urllib.error import URLError
 import pytest
 from fastapi import HTTPException
 
+from app.auth.service_auth import verify_internal_service_token
 from app.document import router
 from app.model.ai_analysis import AIAnalysis
 from app.model.compliance_flag import ComplianceFlag
@@ -50,6 +51,25 @@ class EmptyAnalysisDb:
 
     def first(self):
         return None
+
+    def all(self):
+        return []
+
+
+class ReplacementAnalysisDb(EmptyAnalysisDb):
+    def __init__(self, analyses):
+        self.analyses = analyses
+        self.deleted = []
+        self.commits = 0
+
+    def all(self):
+        return self.analyses
+
+    def delete(self, analysis):
+        self.deleted.append(analysis)
+
+    def commit(self):
+        self.commits += 1
 
 
 def test_analyze_document_retrieves_text_calls_ai_and_persists(monkeypatch):
@@ -109,9 +129,99 @@ def test_data_engineering_response_is_sent_as_exact_ai_payload(monkeypatch):
     assert requests[1].full_url == "http://ai:8001/ai/analyze/1"
     assert requests[1].method == "POST"
     assert json.loads(requests[1].data) == {
-        "document_id": 1,
+        "document_id": "1",
         "extracted_text": "text from DE",
     }
+
+
+def test_data_engineering_rejects_mismatched_document_id(monkeypatch):
+    monkeypatch.setattr(router, "DATA_ENGINEERING_URL", "http://data-engineering:8002")
+    monkeypatch.setattr(
+        router.urllib.request,
+        "urlopen",
+        lambda request, timeout: FakeResponse({"document_id": 2, "extracted_text": "wrong text"}),
+    )
+
+    with pytest.raises(HTTPException) as error:
+        router.call_data_engineering_for_document(1)
+
+    assert error.value.status_code == 502
+
+
+def test_ai_response_normalizes_optional_fields_and_fallbacks():
+    normalized = router.load_ai_service_response({
+        "summary": "Review required",
+        "flags": [
+            {
+                "passage_excerpt": "excerpt",
+                "matched_rule": "rule text",
+                "severity": "high",
+                "explanation": "Explain this",
+            },
+            {"matched_rule_id": "rule-2"},
+            {},
+        ],
+    })
+
+    assert normalized["flags"] == [
+        {
+            "severity": "HIGH",
+            "title": "Untitled finding",
+            "passage": "excerpt",
+            "matchedRule": "rule text",
+            "explanation": "Explain this",
+            "page": None,
+        },
+        {
+            "severity": "LOW",
+            "title": "Untitled finding",
+            "passage": "",
+            "matchedRule": "rule-2",
+            "explanation": "",
+            "page": None,
+        },
+        {
+            "severity": "LOW",
+            "title": "Untitled finding",
+            "passage": "",
+            "matchedRule": "Untitled finding",
+            "explanation": "",
+            "page": None,
+        },
+    ]
+
+
+def test_reanalysis_deletes_all_existing_analyses_before_persisting(monkeypatch):
+    previous_analysis = SimpleNamespace(id=1)
+    legacy_duplicate = SimpleNamespace(id=2)
+    db = ReplacementAnalysisDb([previous_analysis, legacy_duplicate])
+    document = SimpleNamespace(id=1)
+    latest_analysis = SimpleNamespace(summary="latest", flags=[], generated_at=None)
+
+    monkeypatch.setattr(router, "get_document_for_access", lambda document_id, user, db: document)
+    monkeypatch.setattr(router, "call_data_engineering_for_document", lambda document_id: "text")
+    monkeypatch.setattr(router, "call_ai_service_for_document", lambda document_id, text: {})
+    monkeypatch.setattr(router, "load_ai_service_response", lambda payload: {
+        "summary": "latest",
+        "flags": [],
+        "generatedAt": None,
+    })
+    monkeypatch.setattr(router, "persist_ai_analysis", lambda document, db, payload: latest_analysis)
+
+    response = router.analyze_document(1, SimpleNamespace(), db)
+
+    assert db.deleted == [previous_analysis, legacy_duplicate]
+    assert db.commits == 1
+    assert response["summary"] == "latest"
+
+
+def test_internal_file_endpoint_requires_service_token(monkeypatch):
+    monkeypatch.setattr("app.auth.service_auth.INTERNAL_SERVICE_TOKEN", "test-token")
+
+    with pytest.raises(HTTPException) as error:
+        verify_internal_service_token(None)
+
+    assert error.value.status_code == 401
 
 
 def test_ai_response_is_persisted():
