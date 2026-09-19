@@ -376,6 +376,7 @@ async def upload_document(
         file_path=stored_file["file_path"],
         content_type=file.content_type,
         file_size=len(contents),
+        cloudinary_public_id=stored_file["cloudinary_public_id"],
         status="pending_review",
     )
     db.add(revision)
@@ -581,6 +582,7 @@ async def upload_revision(
         file_path=stored_file["file_path"],
         content_type=file.content_type,
         file_size=len(contents),
+        cloudinary_public_id=stored_file["cloudinary_public_id"],
         status="pending_review",
     )
 

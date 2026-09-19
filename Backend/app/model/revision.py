@@ -40,6 +40,11 @@ class DocumentRevision(Base):
         nullable=False
     )
 
+    cloudinary_public_id = Column(
+        String(500),
+        nullable=True
+    )
+
     status = Column(
         String(50),
         nullable=False,

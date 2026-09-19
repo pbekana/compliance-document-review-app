@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from app.model.revision import DocumentRevision
 from app.utils import storage
 
 
@@ -79,3 +80,45 @@ def test_cloudinary_retrieval_downloads_private_asset_to_temporary_file(monkeypa
     assert calls[0][1]["type"] == "authenticated"
     assert calls[0][1]["resource_type"] == "raw"
     temporary_path.unlink()
+
+
+def test_revision_model_allows_null_cloudinary_public_id():
+    revision = DocumentRevision(
+        document_id=1,
+        version=1,
+        stored_filename="file.pdf",
+        file_path="/tmp/file.pdf",
+        content_type="application/pdf",
+        file_size=123,
+        status="pending_review",
+    )
+
+    assert revision.cloudinary_public_id is None
+
+
+def test_cloudinary_revision_upload_saves_public_id(monkeypatch):
+    monkeypatch.setattr(storage, "STORAGE_BACKEND", "cloudinary")
+    monkeypatch.setattr(storage, "CLOUDINARY_CLOUD_NAME", "cloud")
+    monkeypatch.setattr(storage, "CLOUDINARY_API_KEY", "key")
+    monkeypatch.setattr(storage, "CLOUDINARY_API_SECRET", "secret")
+    monkeypatch.setattr(
+        storage.cloudinary.uploader,
+        "upload",
+        lambda contents, **options: {"public_id": "documents/revision-123"},
+    )
+
+    stored = storage.store_document(b"revision", "revised.pdf", "application/pdf")
+
+    assert stored["cloudinary_public_id"] == "documents/revision-123"
+    revision = DocumentRevision(
+        document_id=42,
+        version=2,
+        stored_filename=stored["stored_filename"],
+        file_path=stored["file_path"],
+        content_type="application/pdf",
+        file_size=len(b"revision"),
+        status="pending_review",
+        cloudinary_public_id=stored["cloudinary_public_id"],
+    )
+
+    assert revision.cloudinary_public_id == "documents/revision-123"
