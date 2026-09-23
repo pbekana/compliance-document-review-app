@@ -231,7 +231,7 @@ def call_data_engineering_for_document(document_id: int) -> str:
     request = urllib.request.Request(extraction_url, headers=headers, method="GET")
 
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=90) as response:
             response_body = response.read().decode("utf-8")
             if not response_body:
                 raise HTTPException(
@@ -295,7 +295,7 @@ def call_ai_service_for_document(document_id: str, extracted_text: str) -> dict:
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=90) as response:
             response_body = response.read().decode("utf-8")
             if not response_body:
                 raise HTTPException(

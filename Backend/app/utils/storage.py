@@ -96,7 +96,7 @@ def materialize_document(document) -> Path:
     )
     temporary_file = tempfile.NamedTemporaryFile(delete=False, suffix=Path(document.filename).suffix)
     try:
-        with urllib.request.urlopen(download_url, timeout=60) as response:
+        with urllib.request.urlopen(download_url, timeout=90) as response:
             temporary_file.write(response.read())
         temporary_file.close()
     except Exception:
