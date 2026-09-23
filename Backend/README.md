@@ -87,6 +87,31 @@ The Backend does not use pgvector. If another service owns vector storage, that
 service should enable Supabase's `vector` extension; no vector extension is
 required for this Backend schema.
 
+### Quality and test commands
+
+Run the backend test suite:
+
+```bash
+pytest
+```
+
+Run the lint check:
+
+```bash
+ruff check .
+```
+
+Optionally check formatting:
+
+```bash
+ruff format --check .
+```
+
+The test suite uses safe defaults for local execution. Do not set production
+credentials in the repo or in test code; use environment variables only for
+test-only values such as `TESTING=true`, `JWT_SECRET=test-jwt-secret`, and
+`INTERNAL_SERVICE_TOKEN=test-internal-token`.
+
 ### Railway environment variables
 
 Configure these variables in Railway without committing their values:

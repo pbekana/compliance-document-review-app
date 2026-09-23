@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.sql import func
 
 from app.db.database import Base
@@ -9,29 +9,12 @@ class Review(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    document_id = Column(
-        Integer,
-        ForeignKey("documents.id"),
-        nullable=False
-    )
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
 
-    officer_id = Column(
-        Integer,
-        ForeignKey("users.id"),
-        nullable=False
-    )
+    officer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    decision = Column(
-        String(50),
-        nullable=False
-    )
+    decision = Column(String(50), nullable=False)
 
-    comment = Column(
-        Text,
-        nullable=False
-    )
+    comment = Column(Text, nullable=False)
 
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now()
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

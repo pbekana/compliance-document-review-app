@@ -92,11 +92,15 @@ def test_analyze_document_retrieves_text_calls_ai_and_persists(monkeypatch):
         "call_ai_service_for_document",
         lambda document_id, extracted_text: calls.append(("ai", document_id, extracted_text)) or {"summary": "ok"},
     )
-    monkeypatch.setattr(router, "load_ai_service_response", lambda payload: {
-        "summary": "ok",
-        "flags": [],
-        "generatedAt": None,
-    })
+    monkeypatch.setattr(
+        router,
+        "load_ai_service_response",
+        lambda payload: {
+            "summary": "ok",
+            "flags": [],
+            "generatedAt": None,
+        },
+    )
     monkeypatch.setattr(router, "persist_ai_analysis", lambda document, db, payload: saved_analysis)
 
     response = router.analyze_document(1, SimpleNamespace(), EmptyAnalysisDb())
@@ -149,19 +153,21 @@ def test_data_engineering_rejects_mismatched_document_id(monkeypatch):
 
 
 def test_ai_response_normalizes_optional_fields_and_fallbacks():
-    normalized = router.load_ai_service_response({
-        "summary": "Review required",
-        "flags": [
-            {
-                "passage_excerpt": "excerpt",
-                "matched_rule": "rule text",
-                "severity": "high",
-                "explanation": "Explain this",
-            },
-            {"matched_rule_id": "rule-2"},
-            {},
-        ],
-    })
+    normalized = router.load_ai_service_response(
+        {
+            "summary": "Review required",
+            "flags": [
+                {
+                    "passage_excerpt": "excerpt",
+                    "matched_rule": "rule text",
+                    "severity": "high",
+                    "explanation": "Explain this",
+                },
+                {"matched_rule_id": "rule-2"},
+                {},
+            ],
+        }
+    )
 
     assert normalized["flags"] == [
         {
@@ -201,11 +207,15 @@ def test_reanalysis_deletes_all_existing_analyses_before_persisting(monkeypatch)
     monkeypatch.setattr(router, "get_document_for_access", lambda document_id, user, db: document)
     monkeypatch.setattr(router, "call_data_engineering_for_document", lambda document_id: "text")
     monkeypatch.setattr(router, "call_ai_service_for_document", lambda document_id, text: {})
-    monkeypatch.setattr(router, "load_ai_service_response", lambda payload: {
-        "summary": "latest",
-        "flags": [],
-        "generatedAt": None,
-    })
+    monkeypatch.setattr(
+        router,
+        "load_ai_service_response",
+        lambda payload: {
+            "summary": "latest",
+            "flags": [],
+            "generatedAt": None,
+        },
+    )
     monkeypatch.setattr(router, "persist_ai_analysis", lambda document, db, payload: latest_analysis)
 
     response = router.analyze_document(1, SimpleNamespace(), db)
@@ -232,14 +242,16 @@ def test_ai_response_is_persisted():
         {
             "summary": "Review required",
             "generatedAt": None,
-            "flags": [{
-                "severity": "HIGH",
-                "title": "Missing clause",
-                "passage": "clause",
-                "matchedRule": "rule-1",
-                "explanation": "Required",
-                "page": 2,
-            }],
+            "flags": [
+                {
+                    "severity": "HIGH",
+                    "title": "Missing clause",
+                    "passage": "clause",
+                    "matchedRule": "rule-1",
+                    "explanation": "Required",
+                    "page": 2,
+                }
+            ],
         },
     )
 
@@ -250,7 +262,11 @@ def test_ai_response_is_persisted():
 
 def test_data_engineering_unavailable(monkeypatch):
     monkeypatch.setattr(router, "DATA_ENGINEERING_URL", "http://data-engineering:8002")
-    monkeypatch.setattr(router.urllib.request, "urlopen", lambda request, timeout: (_ for _ in ()).throw(URLError("down")))
+    monkeypatch.setattr(
+        router.urllib.request,
+        "urlopen",
+        lambda request, timeout: (_ for _ in ()).throw(URLError("down")),
+    )
 
     with pytest.raises(HTTPException) as error:
         router.call_data_engineering_for_document(1)
@@ -260,7 +276,11 @@ def test_data_engineering_unavailable(monkeypatch):
 
 def test_ai_unavailable(monkeypatch):
     monkeypatch.setattr(router, "AI_SERVICE_URL", "http://ai:8001")
-    monkeypatch.setattr(router.urllib.request, "urlopen", lambda request, timeout: (_ for _ in ()).throw(URLError("down")))
+    monkeypatch.setattr(
+        router.urllib.request,
+        "urlopen",
+        lambda request, timeout: (_ for _ in ()).throw(URLError("down")),
+    )
 
     with pytest.raises(HTTPException) as error:
         router.call_ai_service_for_document(1, "text")
@@ -268,11 +288,14 @@ def test_ai_unavailable(monkeypatch):
     assert error.value.status_code == 503
 
 
-@pytest.mark.parametrize("payload", [
-    {"document_id": 1},
-    {"document_id": 1, "extracted_text": ""},
-    {"document_id": 1, "extracted_text": 42},
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"document_id": 1},
+        {"document_id": 1, "extracted_text": ""},
+        {"document_id": 1, "extracted_text": 42},
+    ],
+)
 def test_missing_or_invalid_extracted_text(monkeypatch, payload):
     monkeypatch.setattr(router, "DATA_ENGINEERING_URL", "http://data-engineering:8002")
     monkeypatch.setattr(router.urllib.request, "urlopen", lambda request, timeout: FakeResponse(payload))

@@ -9,17 +9,10 @@ from app.model.revision import DocumentRevision
 from app.model.user import User, UserRole
 from app.schema.review import ReviewCreate, ReviewResponse
 
-router = APIRouter(
-    prefix="/api/v1/reviews",
-    tags=["Reviews"]
-)
+router = APIRouter(prefix="/api/v1/reviews", tags=["Reviews"])
 
 
-@router.post(
-    "",
-    response_model=ReviewResponse,
-    status_code=status.HTTP_201_CREATED
-)
+@router.post("", response_model=ReviewResponse, status_code=status.HTTP_201_CREATED)
 def submit_review(
     review_data: ReviewCreate,
     current_user: User = Depends(get_current_user),
@@ -115,12 +108,7 @@ def get_review_history(
             detail="You can only view reviews for your own documents",
         )
 
-    reviews = (
-        db.query(Review)
-        .filter(Review.document_id == documentId)
-        .order_by(Review.created_at.desc())
-        .all()
-    )
+    reviews = db.query(Review).filter(Review.document_id == documentId).order_by(Review.created_at.desc()).all()
 
     result = []
     for review in reviews:
@@ -135,7 +123,9 @@ def get_review_history(
                     "full_name": officer.full_name,
                     "email": officer.email,
                     "role": "COMPLIANCE_OFFICER",
-                } if officer else None,
+                }
+                if officer
+                else None,
                 decision=review.decision,
                 comment=review.comment,
                 timestamp=review.created_at,

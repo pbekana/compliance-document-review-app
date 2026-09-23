@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.sql import func
 
 from app.db.database import Base
@@ -9,54 +9,22 @@ class DocumentRevision(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    document_id = Column(
-        Integer,
-        ForeignKey("documents.id"),
-        nullable=False
-    )
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
 
-    version = Column(
-        Integer,
-        nullable=False
-    )
+    version = Column(Integer, nullable=False)
 
-    stored_filename = Column(
-        String(255),
-        nullable=False
-    )
+    stored_filename = Column(String(255), nullable=False)
 
-    file_path = Column(
-        String(500),
-        nullable=False
-    )
+    file_path = Column(String(500), nullable=False)
 
-    content_type = Column(
-        String(100),
-        nullable=False
-    )
+    content_type = Column(String(100), nullable=False)
 
-    file_size = Column(
-        Integer,
-        nullable=False
-    )
+    file_size = Column(Integer, nullable=False)
 
-    cloudinary_public_id = Column(
-        String(500),
-        nullable=True
-    )
+    cloudinary_public_id = Column(String(500), nullable=True)
 
-    status = Column(
-        String(50),
-        nullable=False,
-        default="pending_review"
-    )
+    status = Column(String(50), nullable=False, default="pending_review")
 
-    comment = Column(
-        Text,
-        nullable=True
-    )
+    comment = Column(Text, nullable=True)
 
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now()
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

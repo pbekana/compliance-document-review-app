@@ -1,7 +1,7 @@
 import json
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.background import BackgroundTasks
@@ -21,7 +21,6 @@ from app.schema.ai_analysis import AIAnalysisResponse
 from app.schema.document import DocumentListResponse, DocumentResponse
 from app.schema.revision import RevisionResponse
 from app.utils.storage import materialize_document, store_document
-
 
 router = APIRouter(
     prefix="/api/v1/documents",
@@ -165,14 +164,16 @@ def load_ai_service_response(payload: dict) -> dict:
             or flag.get("rule")
             or title
         )
-        normalized_flags.append({
-            "severity": str(flag.get("severity") or "LOW").upper(),
-            "title": str(title),
-            "passage": str(flag.get("passage") or flag.get("passage_excerpt") or ""),
-            "matchedRule": str(matched_rule) if matched_rule is not None else None,
-            "explanation": str(flag.get("explanation") or ""),
-            "page": flag.get("page"),
-        })
+        normalized_flags.append(
+            {
+                "severity": str(flag.get("severity") or "LOW").upper(),
+                "title": str(title),
+                "passage": str(flag.get("passage") or flag.get("passage_excerpt") or ""),
+                "matchedRule": str(matched_rule) if matched_rule is not None else None,
+                "explanation": str(flag.get("explanation") or ""),
+                "page": flag.get("page"),
+            }
+        )
 
     generated_at_raw = payload.get("generatedAt") or payload.get("generated_at")
     generated_at = None
@@ -200,15 +201,17 @@ def persist_ai_analysis(document: Document, db: Session, ai_payload: dict) -> AI
     db.refresh(analysis)
 
     for flag in ai_payload["flags"]:
-        db.add(ComplianceFlag(
-            analysis_id=analysis.id,
-            severity=flag["severity"],
-            title=flag["title"],
-            passage=flag["passage"],
-            matched_rule=flag["matchedRule"],
-            explanation=flag["explanation"],
-            page=flag["page"],
-        ))
+        db.add(
+            ComplianceFlag(
+                analysis_id=analysis.id,
+                severity=flag["severity"],
+                title=flag["title"],
+                passage=flag["passage"],
+                matched_rule=flag["matchedRule"],
+                explanation=flag["explanation"],
+                page=flag["page"],
+            )
+        )
     db.commit()
     return analysis
 
@@ -658,7 +661,7 @@ def analyze_document(
     extracted_text = call_data_engineering_for_document(document_id)
     ai_payload = call_ai_service_for_document(document_id, extracted_text)
     normalized_payload = load_ai_service_response(ai_payload)
-    normalized_payload["generatedAt"] = normalized_payload["generatedAt"] or datetime.utcnow()
+    normalized_payload["generatedAt"] = normalized_payload["generatedAt"] or datetime.now(UTC)
 
     existing_analyses = (
         db.query(AIAnalysis)

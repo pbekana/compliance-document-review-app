@@ -6,13 +6,9 @@ from app.auth.security import create_access_token, hash_password, verify_passwor
 from app.db.database import get_db
 from app.model.user import User, UserRole
 from app.schema.auth import AuthResponse, UserLogin
-from app.schema.user import UserRegister, UserResponse
+from app.schema.user import UserRegister
 
-
-router = APIRouter(
-    prefix="/api/v1/auth",
-    tags=["Authentication"]
-)
+router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 
 def serialize_user(user: User) -> dict:
@@ -35,11 +31,7 @@ def serialize_user(user: User) -> dict:
     }
 
 
-@router.post(
-    "/signup",
-    response_model=AuthResponse,
-    status_code=status.HTTP_201_CREATED
-)
+@router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 def signup_user(
     user_data: UserRegister,
     db: Session = Depends(get_db),
@@ -70,10 +62,12 @@ def signup_user(
     db.commit()
     db.refresh(new_user)
 
-    access_token = create_access_token({
-        "sub": str(new_user.id),
-        "role": new_user.role.value,
-    })
+    access_token = create_access_token(
+        {
+            "sub": str(new_user.id),
+            "role": new_user.role.value,
+        }
+    )
 
     return {
         "user": serialize_user(new_user),
@@ -110,10 +104,12 @@ def login_user(
             detail="Invalid email or password",
         )
 
-    access_token = create_access_token({
-        "sub": str(user.id),
-        "role": user.role.value,
-    })
+    access_token = create_access_token(
+        {
+            "sub": str(user.id),
+            "role": user.role.value,
+        }
+    )
 
     return {
         "user": serialize_user(user),
@@ -139,5 +135,3 @@ def get_my_profile(
     current_user: User = Depends(get_current_user),
 ):
     return {"user": serialize_user(current_user)}
-
-

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -22,26 +22,12 @@ class Document(Base):
 
     file_size = Column(Integer, nullable=False)
 
-    status = Column(
-        String(50),
-        nullable=False,
-        default="pending_review"
-    )
+    status = Column(String(50), nullable=False, default="pending_review")
 
-    advisor_id = Column(
-        Integer,
-        ForeignKey("users.id"),
-        nullable=False
-    )
+    advisor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    created_at = Column(
-        DateTime(timezone=True),
-        server_default=func.now()
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    updated_at = Column(
-        DateTime(timezone=True),
-        onupdate=func.now()
-    )
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     ai_analysis = relationship("AIAnalysis", back_populates="document", uselist=False)
